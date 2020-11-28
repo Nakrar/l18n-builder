@@ -5,6 +5,9 @@
 # venv
 .env
 
+# python
+*.pyc
+
 #
 output_tokenization/
 output_translation_jp/

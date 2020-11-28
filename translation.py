@@ -1,14 +1,26 @@
 import asyncio
 import time
+from functools import reduce
 from typing import List
 
 import settings
 from tokenization import get_string_id
 
+mapping = {
+    # proper japanese translation
+    "A": "ア", "B": "ビ", "C": "シ", "D": "ディ", "E": "イ", "F": "フ", "G": "ジ", "H": "チ", "I": "イ", "J": "ジェ",
+    "K": "ケ", "L": "ル", "M": "ム", "N": "ン", "O": "オ", "P": "ピ", "Q": "キュ", "R": "ラ", "S": "ス", "T": "ティ",
+    "U": "ユ", "V": "ビ", "W": "ビ", "X": "", "Y": "", "Z": "ゼ"
+}
+
 
 async def translation_api_request(target: List[str], source_lang='en', target_lang='jp') -> List[str]:
     await asyncio.sleep(1)
-    return ["にほんご"] * len(target)
+    result = [
+        reduce(lambda s, kv: s.replace(kv[0], kv[1]), mapping.items(), string.upper())
+        for string in target
+    ]
+    return result
 
 
 class TranslationClient:
