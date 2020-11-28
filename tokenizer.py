@@ -1,5 +1,4 @@
 import hashlib
-import os
 import re
 from typing import Dict
 
@@ -16,6 +15,14 @@ global_key_storage = {
 }
 
 
+def process_tokenized_to_translated_html(html, token_translation_pairs) -> (str):
+    soup = BeautifulSoup(html, features="html.parser")
+
+    replace_text_in_soup(soup, token_translation_pairs)
+
+    return str(soup)
+
+
 def process_html_to_tokens(file_path: str) -> (str, Dict[str, str]):
     # TODO occasionally misses strings, need to take a deeper look
     # eg "https://www.mitsubishi-motors.com/en/index.html": "Announcement regarding Grant of Stock Options as Equity-linked Compensation(274KB)"
@@ -28,31 +35,32 @@ def process_html_to_tokens(file_path: str) -> (str, Dict[str, str]):
     # For now one solution would be to add it to the localization list, but need to fix before production
     sentences = get_text_from_soup(soup)
 
-    tokens = replace_text_in_soup(soup, sentences)
+    tokens = generate_tokens_for_sentences(sentences)
+    string_key_pair = zip(tokens.values(), tokens.keys())
+    # replace long strings (sentences) first, short strings (single words) next
+    string_key_pair = sorted(string_key_pair, key=lambda pair: len(pair[0]), reverse=True)
+
+    replace_text_in_soup(soup, string_key_pair)
 
     return str(soup), tokens
 
 
-def replace_text_in_soup(soup, strings):
-    tokens = {}
+def generate_tokens_for_sentences(sentences):
+    # same strings would result in the same token, so work on unique strings only
+    sentences = set(sentences)
+    # ignore empty or one-char str since is probably not an english word
+    sentences = (sentence for sentence in sentences if len(sentence) > 1)
 
-    # replace sentences first, separate words later
-    strings.sort(key=len, reverse=True)
+    return {get_string_id(sentence): sentence for sentence in sentences}
 
-    for string in set(strings):
-        # ignore empty or one-char str since is probably not an english word
-        if len(string) > 1:
-            id = get_string_id(string)
-            tokens[id] = string
 
-            # TODO for some reason soup wouldn't find string if there is a parenthesis in it
-            search_regexp = re.compile(f".*{string[:string.find('(') or string.find(')')]}.*")
+def replace_text_in_soup(soup, before_after_pairs):
+    for (before, after) in set(before_after_pairs):
+        search_regexp = re.compile(re.escape(before), re.IGNORECASE)
 
-            node_matches = soup.find_all(text=search_regexp)
-            for node in node_matches:
-                node.replace_with(node.replace(string, id))
-
-    return tokens
+        node_matches = soup.find_all(text=search_regexp)
+        for node in node_matches:
+            node.replace_with(search_regexp.sub(after, node))
 
 
 def get_text_from_soup(soup):

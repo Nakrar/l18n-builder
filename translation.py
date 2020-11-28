@@ -1,18 +1,18 @@
 import asyncio
 import time
-from typing import List
+from typing import List, Callable, Coroutine, Any
 
 from tokenizer import get_string_id
 
 
-async def api_call(target) -> List[str]:
+async def translation_api_request(target: List[str]) -> List[str]:
     await asyncio.sleep(1)
     return ["にほんご"] * len(target)
 
 
 class TranslationClient:
-    per_request_limit_char = 30.000
-    accumulative_limit_char = 100.000
+    per_request_limit_char = 30000
+    accumulative_limit_char = 100000
     accumulative_cooldown_ms = 100 * 1000
 
     def __init__(self):
@@ -86,7 +86,7 @@ class TranslationClient:
 
         await self._insert_request_log(length_total)
 
-        return api_call(target)
+        return await translation_api_request(target)
 
     def split_to_request_groups(self, target):
         # split request to groups that respect `per_request_limit_char`
@@ -103,14 +103,14 @@ class TranslationClient:
             request_groups[-1].append(string)
         return request_groups
 
-    def translate_request_groups(self, request_groups):
+    async def translate_request_groups(self, request_groups):
         tasks = (
             asyncio.create_task(self._make_request_with_resource_block(group))
             for group in request_groups
         )
-        return asyncio.gather(tasks)
+        return await asyncio.gather(*tasks)
 
-    def translate_strings(self, target: List[str]) -> List[str]:
+    async def translate_strings(self, target: List[str]) -> List[str]:
         if not target:
             return []
 
@@ -129,7 +129,7 @@ class TranslationClient:
         strings_to_translate = (string for index, string in enumerate(target) if result[index] is None)
         request_groups = self.split_to_request_groups(strings_to_translate)
 
-        translated_groups = self.translate_request_groups(request_groups)
+        translated_groups = await self.translate_request_groups(request_groups)
 
         translation_list = (translation for group in translated_groups for translation in group)
 

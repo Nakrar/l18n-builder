@@ -6,4 +6,5 @@
 .env
 
 #
-output/
+output_tokenizer/
+output_translation/
