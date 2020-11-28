@@ -1,19 +1,20 @@
 import asyncio
 import time
-from typing import List, Callable, Coroutine, Any
+from typing import List
 
-from tokenizer import get_string_id
+import settings
+from tokenization import get_string_id
 
 
-async def translation_api_request(target: List[str]) -> List[str]:
+async def translation_api_request(target: List[str], source_lang='en', target_lang='jp') -> List[str]:
     await asyncio.sleep(1)
     return ["にほんご"] * len(target)
 
 
 class TranslationClient:
-    per_request_limit_char = 30000
-    accumulative_limit_char = 100000
-    accumulative_cooldown_ms = 100 * 1000
+    per_request_limit_char = settings.PER_REQUEST_LIMIT_CHAR
+    accumulative_limit_char = settings.ACCUMULATIVE_LIMIT_CHAR
+    accumulative_cooldown_ms = settings.ACCUMULATIVE_COOLDOWN_MS
 
     def __init__(self):
         if self.per_request_limit_char > self.accumulative_limit_char:
@@ -25,7 +26,7 @@ class TranslationClient:
         self._insert_lock = asyncio.Lock()
         self._update_lock = asyncio.Lock()
 
-    # todo add localization file that would double up as localization cache
+    # todo add global localization file that would double up as localization cache
     def _read_from_cache(self, string):
         return self._cache.get(get_string_id(string))
 
@@ -65,14 +66,20 @@ class TranslationClient:
                 (block_time_ms, _) = self._request_log[0]
                 cooldown_on_ms = block_time_ms + self.accumulative_cooldown_ms
                 next_available_in_ms = cooldown_on_ms - now_ms
-                # wait for next record cooldown and update limits
-                await asyncio.sleep(next_available_in_ms + 500 / 1000)
+                if next_available_in_ms > 0:
+                    next_available_in_s = next_available_in_ms / 1000
+                    # wait for next record cooldown and update limits
+                    print(f"\tfailed to block {quantity}chr. waiting {next_available_in_s}s.; "
+                          f"used [{self._request_char_sum}/{self.accumulative_limit_char}]")
+                    await asyncio.sleep(next_available_in_s)
                 await self._update_request_log()
 
             # block resources
             now_ms = int(time.time() * 1000)
             self._request_log.append((now_ms, quantity))
             self._request_char_sum += quantity
+            print(f"\tblocked {quantity}chr.; "
+                  f"used [{self._request_char_sum}/{self.accumulative_limit_char}]")
 
     async def _make_request_with_resource_block(self, target):
         """
@@ -101,7 +108,7 @@ class TranslationClient:
                 request_groups.append([])
             # add string to active request
             request_groups[-1].append(string)
-        return request_groups
+        return [group for group in request_groups if group]
 
     async def translate_request_groups(self, request_groups):
         tasks = (
@@ -113,6 +120,7 @@ class TranslationClient:
     async def translate_strings(self, target: List[str]) -> List[str]:
         if not target:
             return []
+        start_ms = int(time.time() * 1000)
 
         # we dont want to split string by ourself since it can change meaning of resulting translation
         # but we still want to be able to translate it if there is such entry in out localization file
@@ -120,13 +128,13 @@ class TranslationClient:
                len(string) > self.per_request_limit_char
                and self._read_from_cache(string) is None
                ):
-            raise ValueError(f"Maximum length for single string is {self.per_request_limit_char}")
+            raise ValueError(f"Maximum length of a single string is {self.per_request_limit_char}")
 
         # we want to keep order of input strings, so create array and pre fill it with cached results
         result = [self._read_from_cache(string) for string in target]
 
         # split request to groups that respect `per_request_limit_char`
-        strings_to_translate = (string for index, string in enumerate(target) if result[index] is None)
+        strings_to_translate = [string for index, string in enumerate(target) if result[index] is None]
         request_groups = self.split_to_request_groups(strings_to_translate)
 
         translated_groups = await self.translate_request_groups(request_groups)
@@ -146,5 +154,7 @@ class TranslationClient:
             original = target[index]
             self._write_to_cache(original, translation)
 
-        # TODO maybe save cache to disk here
+        print(f"\ttranslated {sum(map(len, target))}ch. in {int(time.time() * 1000) - start_ms}ms. "
+              f"with {sum(map(len, target)) - sum(map(len, strings_to_translate))}ch. from cache")
+        # TODO save cache to global localization file here
         return result

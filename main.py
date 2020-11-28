@@ -1,67 +1,73 @@
-"""
-goal:
-
-Input of html files/ fragments
-
-Output of translated html file,
-
-
-"""
 import asyncio
 import json
 import os
 
-from tokenizer import process_html_to_tokens, process_tokenized_to_translated_html
+from settings import OUTPUT_TOKENIZATION_FOLDER, INPUT_FOLDER, OUTPUT_TRANSLATION_JP_FOLDER
+from tokenization import process_html_to_tokens, process_tokenized_to_translated_html
 from translation import TranslationClient
 
 ENGLISH = "en"
 JAPANESE = "jp"
 
 
-def save_file(directory, file_name, content):
+def save_file(directory: str, file_name: str, content: str):
     if not os.path.isdir(directory):
         os.mkdir(directory)
-    with open(os.path.join(directory, file_name), "w") as file:
-        file.write(content)
+    with open(os.path.join(directory, file_name), 'wb') as file:
+        file.write(content.encode('utf8'))
+
+
+async def do_translate(file_name, translation_client, tokens=None):
+    # load tokenized html and tokens
+    tokenized_html_path = os.path.join(OUTPUT_TOKENIZATION_FOLDER, file_name)
+    tokenized_tokens_path = os.path.join(OUTPUT_TOKENIZATION_FOLDER, file_name.replace('html', 'json'))
+    with open(tokenized_html_path, "r") as file:
+        tokenized_html = file.read()
+    # according to the task, we need to be able to pass tokens directly
+    # "Please provide code that will accept our associated array of texts indexed by unique IDs"
+    if tokens is None:
+        with open(tokenized_tokens_path, "r") as file:
+            tokens = json.loads(file.read())
+
+    # run translation service
+    translated_strings = await translation_client.translate_strings(list(tokens.values()))
+    # for now assume that original language is English, translation is Japanese
+    # create dict with {key: LocalizationString}
+    translated_tokens = {
+        k: {ENGLISH: en, JAPANESE: jp}
+        for k, en, jp
+        in zip(tokens.keys(), tokens.values(), translated_strings)
+    }
+    token_translation_pairs = ((k, v[JAPANESE]) for k, v in translated_tokens.items())
+    translated_html = process_tokenized_to_translated_html(tokenized_html, token_translation_pairs)
+    # save translation output
+    save_file(OUTPUT_TRANSLATION_JP_FOLDER, file_name, translated_html)
+    serialized_translated_tokens = json.dumps(translated_tokens, ensure_ascii=False, indent=4)
+    save_file(OUTPUT_TRANSLATION_JP_FOLDER, file_name.replace("html", "json"), serialized_translated_tokens)
+
+
+def do_tokenize(file_name):
+    # run tokenization
+    input_file_path = os.path.join(INPUT_FOLDER, file_name)
+    tokenized_html, tokens = process_html_to_tokens(input_file_path)
+    # save tokenization output
+    save_file(OUTPUT_TOKENIZATION_FOLDER, file_name, tokenized_html)
+    serialized_tokens = json.dumps(tokens, ensure_ascii=False, indent=4)
+    save_file(OUTPUT_TOKENIZATION_FOLDER, file_name.replace("html", "json"), serialized_tokens)
+    return tokenized_html, tokens
 
 
 async def main():
-    input_folder = "./input"
-    output_tokenizer_folder = "./output_tokenizer"
-    output_translation_folder = "./output_translation"
-
     translation_client = TranslationClient()
 
-    # read file
-    if os.path.exists(input_folder):
-        for file_name in os.listdir(input_folder):
-            if file_name.endswith(".html"):
-                # run tokenizer
-                input_file_path = os.path.join(input_folder, file_name)
-                tokenized_html, tokens = process_html_to_tokens(input_file_path)
-
-                # save tokenizer output
-                save_file(output_tokenizer_folder, file_name, tokenized_html)
-                serialized_tokens = json.dumps(tokens)
-                save_file(output_tokenizer_folder, file_name.replace("html", "json"), serialized_tokens)
-
-                # run translation service
-                # TODO run asynchronously for several files
-                translated_strings = await translation_client.translate_strings(list(tokens.values()))
-                # for now assume that original language is English, translation is Japanese
-                # create dict with {key: LocalizationString}
-                translated_tokens = {
-                    k: {ENGLISH: en, JAPANESE: jp}
-                    for k, en, jp
-                    in zip(tokens.keys(), tokens.values(), translated_strings)
-                }
-                token_translation_pairs = ((k, v[JAPANESE]) for k, v in translated_tokens.items())
-                translated_html = process_tokenized_to_translated_html(tokenized_html, token_translation_pairs)
-
-                # save translation output
-                save_file(output_translation_folder, file_name, translated_html)
-                serialized_translated_tokens = json.dumps(translated_tokens)
-                save_file(output_translation_folder, file_name.replace("html", "json"), serialized_translated_tokens)
+    # for each HTML file in INPUT_FOLDER, tokenize and translate
+    if os.path.exists(INPUT_FOLDER):
+        all_html_files = [file_name for file_name in os.listdir(INPUT_FOLDER) if file_name.endswith(".html")]
+        for i, file_name in enumerate(all_html_files):
+            print(f'\nwork on [{i}/{len(all_html_files)}] "{file_name}"')
+            # TODO run asynchronously
+            do_tokenize(file_name)
+            await do_translate(file_name, translation_client)
 
     return
 

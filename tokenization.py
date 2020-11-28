@@ -4,16 +4,6 @@ from typing import Dict
 
 from bs4 import BeautifulSoup
 
-INPUT_FOLDER = "./input"
-OUTPUT_FOLDER = "./output"
-
-JAPANESE = "jp"
-ENGLISH = "en"
-
-global_key_storage = {
-    "==hello==": {JAPANESE: "konichiva", ENGLISH: "hello"},
-}
-
 
 def process_tokenized_to_translated_html(html, token_translation_pairs) -> (str):
     soup = BeautifulSoup(html, features="html.parser")
@@ -24,8 +14,6 @@ def process_tokenized_to_translated_html(html, token_translation_pairs) -> (str)
 
 
 def process_html_to_tokens(file_path: str) -> (str, Dict[str, str]):
-    # TODO occasionally misses strings, need to take a deeper look
-    # eg "https://www.mitsubishi-motors.com/en/index.html": "Announcement regarding Grant of Stock Options as Equity-linked Compensation(274KB)"
     with open(file_path, "r") as file:
         html = file.read()
 
