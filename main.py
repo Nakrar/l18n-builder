@@ -8,9 +8,11 @@ from translation import TranslationClient, process_html_tokens_to_translation
 
 
 def save_file(directory: str, file_name: str, content: str):
+    file_path = os.path.join(directory, file_name)
+    print(f"\tsaving file {file_path}")
     if not os.path.isdir(directory):
         os.mkdir(directory)
-    with open(os.path.join(directory, file_name), 'wb') as file:
+    with open(file_path, 'wb') as file:
         file.write(content.encode('utf8'))
 
 
@@ -36,6 +38,7 @@ async def do_translate(file_name, translation_client):
     save_file(OUTPUT_TRANSLATION_JP_FOLDER, file_name.replace("html", "json"), serialized_translated_tokens)
 
     return translated_html, translated_tokens
+
 
 def do_tokenize(file_name):
     # load input HTML

@@ -1,6 +1,8 @@
-# i18n Builder
+# i18n Builder (exercise)
 
-Tokenization and translation modules for the future system.
+We're creating tokenization and translation modules for the future localization system. 
+
+The finished system would be capable of translating HTML files and fragments into various languages. Also, it would produce localization files completed with original strings and string tokens.
 
 ### Usage
 Tool would process `.html` files in `./input` folder. Outputs tokens and processed HTML files to `./output_tokenization` and `./output_translation_jp` for tokenization and translation modules respectively.  
@@ -14,9 +16,11 @@ Requires python 3.7+
 From the application folder:
 
 1. create new venv `virtualenv .env`
-1. activate venv `source .env/bin/python`
+1. activate venv `source ./.env/bin/activate`
 1. install dependencies `pip install -r requirements.txt`
 1. run main.py `python main.py`
+
+To run tests `python -m unittest`
 
 ### Possible improvements
 1. Add more tests.
@@ -36,7 +40,7 @@ From the application folder:
 
 To generate a token for a word/sentence we're:
 1. Normalizing target string. It would allow us to get the same hash for the same strings, even if two strings would be in a different case.
-1. Run hash function and truncating result to 14 chars. The truncated result should be unique enough but would allow us to save some space and make HTML and token files more readable.
+1. Run hash function and truncating result to 14 chars. The truncated result should be unique enough but would allow us to save some space and make HTML and token files more readable. Could be adjusted based on anticipated number of unique strings.  
 
 While designing the tokenization system I've decided to split text on a by-sentence basis.
 It would increase the granularity of the localization.
