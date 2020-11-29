@@ -3,8 +3,10 @@ import time
 from functools import reduce
 from typing import List
 
-import settings
-from tokenization import get_string_id
+from bs4 import BeautifulSoup
+
+from helpers import replace_text_in_soup, get_string_id
+from settings import ENGLISH, JAPANESE, PER_REQUEST_LIMIT_CHAR, ACCUMULATIVE_LIMIT_CHAR, ACCUMULATIVE_COOLDOWN_MS
 
 mapping = {
     # proper japanese translation
@@ -23,15 +25,35 @@ async def translation_api_request(target: List[str], source_lang='en', target_la
     return result
 
 
-class TranslationClient:
-    per_request_limit_char = settings.PER_REQUEST_LIMIT_CHAR
-    accumulative_limit_char = settings.ACCUMULATIVE_LIMIT_CHAR
-    accumulative_cooldown_ms = settings.ACCUMULATIVE_COOLDOWN_MS
+async def process_html_tokens_to_translation(tokenized_html, tokens, translation_client):
+    # translate tokens and create new tokens, containing original and translated string
+    strings_to_translate = list(tokens.values())
+    translated_strings = await translation_client.translate_strings(strings_to_translate)
+    translated_tokens = {
+        k: {ENGLISH: en, JAPANESE: jp}
+        for k, en, jp
+        in zip(tokens.keys(), tokens.values(), translated_strings)
+    }
 
-    def __init__(self):
+    # replace tokens with translation
+    token_translation_pairs = ((k, v[JAPANESE]) for k, v in translated_tokens.items())
+    soup = BeautifulSoup(tokenized_html, features="html.parser")
+    replace_text_in_soup(soup, token_translation_pairs)
+    translated_html = str(soup)
+
+    return translated_html, translated_tokens
+
+
+class TranslationClient:
+    per_request_limit_char = PER_REQUEST_LIMIT_CHAR
+    accumulative_limit_char = ACCUMULATIVE_LIMIT_CHAR
+    accumulative_cooldown_ms = ACCUMULATIVE_COOLDOWN_MS
+
+    def __init__(self, translation_api_call=translation_api_request):
         if self.per_request_limit_char > self.accumulative_limit_char:
             raise ValueError("accumulative_limit_char should be more or equal to per_request_limit_char")
 
+        self._translation_api_call = translation_api_call
         self._request_log = []
         self._request_char_sum = 0
         self._cache = {}  # todo local from localization file, save to localization file
@@ -105,7 +127,7 @@ class TranslationClient:
 
         await self._insert_request_log(length_total)
 
-        return await translation_api_request(target)
+        return await self._translation_api_call(target)
 
     def split_to_request_groups(self, target):
         # split request to groups that respect `per_request_limit_char`
