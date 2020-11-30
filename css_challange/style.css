@@ -1,0 +1,138 @@
+:root {
+    --img-space: 8px;
+}
+
+/* container with title */
+
+.upload-photos {
+    padding: 24px;
+    margin: 0 25%;
+    display: flex;
+    flex-direction: column;
+}
+
+.upload-photos::before {
+    font-family: sans-serif;
+    font-weight: 400;
+    content: "内観写真（保管場所の様子がわかるもの）";
+}
+
+/* upload button */
+
+.el-upload {
+    order: 1;
+    width: 220px;
+}
+
+.el-upload button {
+    /* consider setting tabindex="-1" and using JS on .upload-photos to handle upload actions */
+    display: flex;
+    cursor: pointer;
+    width: 100%;
+    height: 42px;
+    color: white;
+    background-color: #00c7b4; /* same color with close button */
+    border: none;
+    border-radius: 21px;
+    font-size: 14px;
+    align-items: center;
+    justify-content: space-evenly;
+}
+
+.el-upload img {
+    width: 24px;
+    height: 24px;
+    /* consider using svg + fill */
+    filter: invert(100%);
+}
+
+.el-upload input {
+    /* consider setting tabindex="-1" and using JS on .upload-photos to handle upload actions */
+    display: none; /* hide for now, later use with button and drop-down*/
+}
+
+/* gallery */
+
+
+.el-upload-list {
+    margin: 5px calc(-1 * var(--img-space));
+    padding-inline-start: 0;
+    display: flex;
+    flex-wrap: wrap;
+    flex: 1 0 auto;
+}
+
+.el-upload-list__item:first-of-type {
+    width: calc(100% - 2 * var(--img-space));
+}
+
+.el-upload-list__item:first-of-type::before {
+    content: '';
+    display: block;
+    padding-bottom: 75%;
+}
+
+.el-upload-list__item img[src=""] {
+    opacity: 0
+}
+
+.el-upload-list__item::before {
+    content: '';
+    display: block;
+    padding-bottom: 100%;
+}
+
+.el-upload-list__item {
+    display: block;
+    position: relative;
+    flex: 1 0 auto;
+    background: #f4f4f4;
+    margin: var(--img-space);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.el-upload-list__item div {
+    width: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    overflow: hidden;
+}
+
+.el-upload-list__item-thumbnail {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* remove button */
+
+.btn-remove {
+    position: absolute;
+    right: 8px;
+    top: 8px;
+    padding: 8px;
+    background: white;
+    border-radius: 50%;
+    cursor: pointer;
+    visibility: hidden;
+}
+
+.btn-remove img {
+    width: 18px;
+    height: 18px;
+    /* consider replacing with svg tag + fill */
+    filter: invert(75%) sepia(21%) saturate(935%) hue-rotate(123deg) brightness(85%) contrast(97%);
+}
+
+.el-upload-list__item.is-ready:hover .btn-remove {
+    opacity: 0.8;
+    visibility: visible;
+}
+
+.el-upload-list__item.is-ready .btn-remove:hover {
+    opacity: 1;
+}
